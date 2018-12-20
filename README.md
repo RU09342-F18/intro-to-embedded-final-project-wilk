@@ -25,7 +25,7 @@ The microcontroller is the main processing unit for the Door Counter, using the 
 The Ultrasonic sensor send pulses in 10 micro-second increments. When the sensor recieves the pulse, it will generate a 8 cycles of sonic burst independed from microcontroller. Sent ECHO pulse back to microcontroller are measured. The sensor has 4 pins. TRIG is connected to P1.4 (output) and ECHO is connected to P1.3 (input). The other two pins are used to power the senor, ground and 5V source. 
 
 ### Circuit Diagram
-<img src="https://github.com/RU09342-F18/intro-to-embedded-final-project-russells-muscle/blob/master/FinalProjSchem.PNG" height="500" width="665">
+<img src="https://github.com/RU09342-F18/intro-to-embedded-final-project-wilk/blob/master/Capture3.PNG" height="500" width="665">
 
 ## Parts List
 • 1 MSP-EXP430G2553 Microcontroller
