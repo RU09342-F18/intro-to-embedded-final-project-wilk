@@ -1,0 +1,126 @@
+//Patrick Wilk
+// Final Lab 12/19/2018
+// Credit :  KristjanB
+// Ultrasonic Door Sensor
+
+
+#include <msp430.h>
+#include <stdint.h>
+
+// INITIALIZE VARIABLES
+
+int target = 20;
+int count = 0;
+long sensor;
+int milisec;
+int distance;
+
+
+
+#define DEFAULT 20
+#define ECHO BIT3
+#define TRIGGER BIT4
+#define LED BIT6
+
+
+void main(void)
+{
+
+  BCSCTL1 = CALBC1_1MHZ;
+  DCOCTL = CALDCO_1MHZ;                     // SMCLK 1MHz
+  WDTCTL = WDTPW + WDTHOLD;                 // Stop WDT
+
+  // TIMER CONFIGURATION
+
+  TA0CTL = TASSEL_2 + MC_1;                  // SMCLK, upmode
+  TA0CCTL0 = CCIE;                             // CCR0 interrupt enabled
+  TA0CCR0 = 10000;                      // 1 milisecond at 1mhz
+
+  // INPUT/OUTPUT CONFIGURATION
+
+  P1IFG  = 0x00;               //clear all interrupt flags
+  P1DIR |= LED;                // P1.6 as output for LED
+  P1OUT &= ~LED;               // turn LED off
+  P1DIR |= TRIGGER;            // trigger output
+
+      DCOCTL = 0;                               // Select lowest DCOx and MODx settings
+    BCSCTL1 = CALBC1_1MHZ;                    // Set DCO
+    DCOCTL = CALDCO_1MHZ;
+
+    // UART TRANSMIT AND READ CONFIGURATION
+
+    P1SEL = BIT1 + BIT2 ;                     // P1.1 RXD, P1.2 TXD
+    P1SEL2 = BIT1 + BIT2 ;                    // P1.1 RXD, P1.2 TXD
+    UCA0CTL1 |= UCSSEL_2;                     // SMCLK
+    UCA0BR0 = 104;                            // 1MHz 9600 baud
+    UCA0BR1 = 0;                              // 1MHz 9600 baud
+    UCA0MCTL = UCBRS0;                        // UCBRSX = 1 modulation
+    UCA0CTL1 &= ~UCSWRST;                     // Initialize USCI state machine
+    IE2 |= UCA0RXIE;                          // Rx interrupt USCI_A0 RX enable
+
+
+  _BIS_SR(GIE);                         // global interrupt enable
+
+ while(1){
+    P1IE &= ~0x01;          // disable interrupt
+    P1OUT |= TRIGGER;          // generate pulse
+    __delay_cycles(10);             // for 10 microssec
+    P1OUT &= ~TRIGGER;                 // stop pulse
+    P1DIR &= ~ECHO;         // pin P1.2 input
+    P1IFG = 0x00;                   // clear flag
+    P1IE |= ECHO;           // enable ECHO pin interrupt
+    P1IES &= ~ECHO;         // rising edge ECHO pin
+
+        __delay_cycles(30000);          // delay for 30ms
+        distance = sensor/58;           // convert echo length in cm
+        if((distance < target) && (distance != 0)){
+            P1OUT |= LED;           //turning LED on if distance is less than 20cm and if distance isn't 0.
+            count ++;                             // increment count
+        while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
+         UCA0TXBUF = count;                       //transmit count
+         __delay_cycles(1000000);                 // delay one second in order to avoid quick reading (debounce)
+        }
+        else
+            P1OUT &= ~LED;
+
+ }
+}
+#pragma vector=PORT1_VECTOR
+__interrupt void Port_1(void)
+{
+    if(P1IFG&ECHO)  // interrupt pending
+        {
+          if(!(P1IES&ECHO)) //  rising edge
+          {
+            TACTL|=TACLR;   // clears timer A
+            milisec = 0;
+            P1IES |= ECHO;  //falling edge
+          }
+          else
+          {
+            sensor = (long)milisec*1000 + (long)TAR;    //calculating length of ECHO
+
+          }
+    P1IFG &= ~ECHO;             //clear flag
+    }
+}
+
+#pragma vector=TIMER0_A0_VECTOR
+__interrupt void Timer_A (void)
+{
+  milisec++;
+}
+
+#pragma vector=USCIAB0RX_VECTOR
+__interrupt void USCI0RX_ISR(void)
+
+{
+
+    while (!(IFG2&UCA0TXIFG));                // USCI_A0 TX buffer ready?
+     target = UCA0RXBUF;
+     if (target == 0){                       // Reset count to 0
+         count = 0;
+         target = DEFAULT;                  // Reset target to default
+     }
+}
+
